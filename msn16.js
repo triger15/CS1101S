@@ -2,7 +2,7 @@
 // Customization
 //  - You can personalize your character by setting the following values
 //-------------------------------------------------------------------------
-var shortname   = "ccb";
+var shortname   = "zzz";
 //-------------------------------------------------------------------------
 // idkwtf
 //-------------------------------------------------------------------------
@@ -62,11 +62,9 @@ idkwtf.prototype.__act = function() {
         //haveKeycard = true;
         display(myItems);
     } else {}
-    
     // find adjacent rooms
     var nearbyRooms = myRoom.getNeighbours();
     var directions = myRoom.getExits();
-    
     
     // moving habits
     var protectedRm = filter(function(x) {
@@ -77,16 +75,16 @@ idkwtf.prototype.__act = function() {
     // enter protected room
     if (!is_empty_list(protectedRm)) {
         if (!is_empty_list(myKeycards)) {
-            alert("ROOM here");
+            display("ROOM here");
             this.moveTo(head(protectedRm));
         } else {
             // stay for bots
-            alert("NO CARD");
+            display("NO CARD");
         }
-        
+    // move randomly to other rooms
     } else if (doImove) {
         display(directions);
-        var nextMove = list_ref(directions, getRandomIntInclusive(0, length(directions)));
+        var nextMove = list_ref(directions, getRandomInt(0, length(directions)));
         this.go(nextMove);
     } else {}
 };
@@ -94,8 +92,7 @@ idkwtf.prototype.__act = function() {
 var newPlayer = new idkwtf(shortname);
 test_task2(newPlayer);
 
-function getRandomIntInclusive(min, max) {
-    min = math_ceil(min);
-    max = math_floor(max);
-    return math_floor(math_random() * (max - min + 1)) + min; //The maximum is inclusive and the minimum is inclusive 
+function getRandomInt(min, max) {
+    return math_floor(math_random() * (math_floor(max) - math_ceil(min)) ); //The maximum is exclusive and the minimum is inclusive
 }
+
