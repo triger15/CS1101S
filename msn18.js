@@ -71,9 +71,56 @@ function find_room(current_room) {
     }
 }
 
+// M18 T1: find enemies
+//var dir_list = ["north", "south", "east", "west"];
+// ADD type of weapon
+function find_enemies(current_room, range, directions) {
+    //var distance = 0;
+    var enemy_list = [];
+    display("Ddwd  " + is_empty_list(enemy_list));
+    
+    function direction_helper(room, dir, distance) {
+        if (distance === range) {
+            display("max range " + room.getName());
+            //return;
+        } else {
+            var roomEnemies = filter(function(x) {return (is_instance_of(x, ServiceBot) 
+                        || is_instance_of(x, SecurityDrone));}, room.getOccupants());
+            if (!is_empty_list(roomEnemies)) {
+                // found enemy    
+                display("enemy " + roomEnemies + is_list(roomEnemies));
+                enemy_list = append(enemy_list, roomEnemies);
+            } else {}
+            
+            var nextrm = room.getExit(dir);
+            if (is_object(nextrm)) {
+                return direction_helper(room.getExit(dir), dir, distance + 1);
+            } else {display("nothing beyond " + room.getName());}
+            
+        }
+    }
+    
+    function unary_f(dir) {
+        return direction_helper(current_room, dir, 0);
+    }
+    // check each direction according to specified range
+    for_each(unary_f, directions);
+    display("en1");
+    display(enemy_list);
+    display("en ");
+    //return enemy_list;
+}
+
 idkwtf.prototype.__act = function() {
     Player.prototype.__act.call(this);
     var myRoom = this.getLocation();
+    
+    // t
+    
+    var possible_dir = filter(function(x) {return ((x !== "up") && (x !== "down"));}, myRoom.getExits());
+    display(possible_dir);
+    find_enemies(myRoom, 3, possible_dir);
+    
     
     /* M17 T1  remember rooms */
     var myRoomName = myRoom.getName();
@@ -85,32 +132,33 @@ idkwtf.prototype.__act = function() {
     
     // check possessions
     var myItems = this.getPossessions();
-    var myWeapon = undefined;
+    //var myWeapon = undefined;
     
-    // find weapon
-    var weaponList = filter(function(x) 
-                {return is_instance_of(x, Weapon);}, myItems);
-    // equip weapon
-    if (!is_empty_list(weaponList)) {
-        myWeapon = head(weaponList);
-        //display("my weapon =" + myWeapon.getName());
-        //display("weapon charging = " + myWeapon.isCharging());
-    } else {}
+    // M18 T1: equip weapons
+    var lightsaber = head(filter(function(x) 
+                {return is_instance_of(x, MeleeWeapon);}, myItems));
+    var rifle = head(filter(function(x) 
+                {return is_instance_of(x, RangedWeapon);}, myItems));
+    var rifle_range = rifle.getRange();
+    var lightning = head(filter(function(x) 
+                {return is_instance_of(x, SpellWeapon);}, myItems));
+    var lightning_range = lightning.getRange();
+    display(lightning_range + ":lightning ||  rifle:" + rifle_range);
     
     // actions on occupants of room
     var occupants = myRoom.getOccupants();
     display("others here :" + occupants);
     
-    // find serviceBots & securityDrones MODIFIED M17 T1
+    // find serviceBots & securityDrones MODIFIED M17 T1 in my room
     var enemyList = filter(function(x) {
                 return (is_instance_of(x, ServiceBot) 
                         || is_instance_of(x, SecurityDrone));}, occupants);
-    // attack enemies
+    // M18 T1 : attack enemies in same room
     if (!is_empty_list(enemyList)) {
         display("enemy is " + head(enemyList).getName());
-        if (!myWeapon.isCharging()) {
+        if (!lightsaber.isCharging()) {
             var targets = enemyList;
-            this.use(myWeapon, targets);
+            this.use(lightsaber, targets);
         } else {}
     } else {}
     
@@ -129,7 +177,6 @@ idkwtf.prototype.__act = function() {
     
     // find adjacent rooms
     var nearbyRooms = myRoom.getNeighbours();
-    var directions = myRoom.getExits();
     
     // detect protector rooms
     var protectedRm = filter(function(x) {
