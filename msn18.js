@@ -24,6 +24,8 @@ var roomsEntered = {};
 //remember generator room
 var generatorRoom = undefined;
 var path = [];
+// M18
+var bombUsed = false;
 
 //BFS algo to find room
 function find_room(current_room) {
@@ -146,6 +148,9 @@ idkwtf.prototype.__act = function() {
     var lightning = head(filter(function(x) 
                 {return is_instance_of(x, SpellWeapon);}, myItems));
     var lightning_range = lightning.getRange();
+    // M18 T2: equip bomb
+    var bomb = head(filter(function(x) 
+                {return is_instance_of(x, Bomb);}, myItems));
     
     // actions on occupants of room
     var occupants = myRoom.getOccupants();
@@ -198,10 +203,15 @@ idkwtf.prototype.__act = function() {
                 (function(x) {return roomsEntered[x.getName()] === undefined; }, nearbyRooms);
     
     // enter protected room
-    if (!is_empty_list(protectedRm)) {
+    if (!is_empty_list(protectedRm) && !bombUsed) {
         if (!is_empty_list(myKeycards)) {
             display("ROOM here");
             this.moveTo(head(protectedRm));
+            // M18 T2: plant bomb and GTFO
+            if (bomb.canBeUsed()) {
+                this.use(bomb);
+                bombUsed = true;
+            } else {}
         } else {
             // M17 T2 rmb room
             generatorRoom = head(protectedRm);
@@ -209,8 +219,14 @@ idkwtf.prototype.__act = function() {
             this.moveTo(list_ref(nearbyRooms, getRandomInt(0, length(nearbyRooms))));
         }
         
+    // M18 T2: GTFO
+    } else if (bombUsed) {
+        display("bomb used");
+        var ok_rooms = filter(function(x) {return !is_instance_of(x, ProtectedRoom);}, nearbyRooms);
+        this.moveTo(head(ok_rooms));
+        
     // M17 T2: got keycard chiong to room
-    } else if (!is_empty_list(myKeycards)) {
+    } else if (!is_empty_list(myKeycards) && !bombUsed) {
         // recalculate if moved (respawn)
         var next_move = path.pop();
         this.moveTo(next_move);
@@ -218,6 +234,9 @@ idkwtf.prototype.__act = function() {
     // M17 T1: found unvisited room, move to random unvisited room
     } else if (!is_empty_list(unvisited_rooms)) {
         this.moveTo(list_ref(unvisited_rooms, getRandomInt(0, length(unvisited_rooms))));
+        
+    
+    
     // no unvisited room
     } else {
         this.moveTo(list_ref(nearbyRooms, getRandomInt(0, length(nearbyRooms))));
@@ -226,4 +245,6 @@ idkwtf.prototype.__act = function() {
 
 // Uncomment the following to test
 var newPlayer = new idkwtf(shortname);
-test_task1(newPlayer);
+test_task2(newPlayer);
+
+// "generator is destroyed!"
