@@ -24,6 +24,8 @@ var roomsEntered = {};
 //remember generator room
 var generatorRoom = undefined;
 var path = [];
+// M18
+var bombUsed = false;
 
 //BFS algo to find room
 function find_room(current_room) {
@@ -72,15 +74,14 @@ function find_room(current_room) {
 }
 
 // M18 T1: find enemies
-//var dir_list = ["north", "south", "east", "west"];
-// ADD type of weapon
-function find_enemies(current_room, range, directions) {
+// return either direction of targets or list of targets
+function find_enemies(current_room, range, directions, type) {
     //var distance = 0;
     var enemy_list = [];
-    display("Ddwd  " + is_empty_list(enemy_list));
-    
+    var direction = undefined;
+    // recursively find targets in same direction
     function direction_helper(room, dir, distance) {
-        if (distance === range) {
+        if (distance > range) {
             display("max range " + room.getName());
             //return;
         } else {
@@ -88,38 +89,42 @@ function find_enemies(current_room, range, directions) {
                         || is_instance_of(x, SecurityDrone));}, room.getOccupants());
             if (!is_empty_list(roomEnemies)) {
                 // found enemy    
-                display("enemy " + roomEnemies + is_list(roomEnemies));
-                enemy_list = append(enemy_list, roomEnemies);
+                // append enemy list if intending to use rifle, else get direction
+                if (type === "ranged") {
+                    enemy_list = append(enemy_list, roomEnemies);
+                } else {
+                    direction = dir;
+                }
             } else {}
-            
+            // get next room, checking if it exists
             var nextrm = room.getExit(dir);
             if (is_object(nextrm)) {
                 return direction_helper(room.getExit(dir), dir, distance + 1);
-            } else {display("nothing beyond " + room.getName());}
+            } else {}
             
         }
     }
-    
+    // pass to for_each
     function unary_f(dir) {
         return direction_helper(current_room, dir, 0);
     }
     // check each direction according to specified range
     for_each(unary_f, directions);
-    display("en1");
-    display(enemy_list);
-    display("en ");
-    //return enemy_list;
+    // return target list if ranged weapon specified, else direction of targets
+    if (type === "ranged") {
+        return enemy_list;
+    } else {
+        return direction;
+    }
 }
 
 idkwtf.prototype.__act = function() {
     Player.prototype.__act.call(this);
     var myRoom = this.getLocation();
     
-    // t
-    
+    // M18 T1
     var possible_dir = filter(function(x) {return ((x !== "up") && (x !== "down"));}, myRoom.getExits());
     display(possible_dir);
-    find_enemies(myRoom, 3, possible_dir);
     
     
     /* M17 T1  remember rooms */
@@ -143,23 +148,31 @@ idkwtf.prototype.__act = function() {
     var lightning = head(filter(function(x) 
                 {return is_instance_of(x, SpellWeapon);}, myItems));
     var lightning_range = lightning.getRange();
-    display(lightning_range + ":lightning ||  rifle:" + rifle_range);
+    // M18 T2: equip bomb
+    var bomb = head(filter(function(x) 
+                {return is_instance_of(x, Bomb);}, myItems));
     
     // actions on occupants of room
     var occupants = myRoom.getOccupants();
-    display("others here :" + occupants);
     
     // find serviceBots & securityDrones MODIFIED M17 T1 in my room
     var enemyList = filter(function(x) {
                 return (is_instance_of(x, ServiceBot) 
                         || is_instance_of(x, SecurityDrone));}, occupants);
     // M18 T1 : attack enemies in same room
-    if (!is_empty_list(enemyList)) {
-        display("enemy is " + head(enemyList).getName());
-        if (!lightsaber.isCharging()) {
-            var targets = enemyList;
-            this.use(lightsaber, targets);
-        } else {}
+    if (!is_empty_list(enemyList) && !lightsaber.isCharging()) {
+        this.use(lightsaber, enemyList);
+    } else {}
+    
+    // M18 T1: continue attacking. use ranged weapon before spell weapon
+    var ranged_en = find_enemies(myRoom, rifle_range, possible_dir, "ranged");
+    if (!is_empty_list(ranged_en) && !rifle.isCharging()) {
+        this.use(rifle, ranged_en);
+    } else {}
+    
+    var spell_dir = find_enemies(myRoom, lightning_range, possible_dir, "spell");
+    if (spell_dir !== undefined && !lightning.isCharging()) {
+        this.use(lightning, spell_dir);
     } else {}
     
     
@@ -190,10 +203,15 @@ idkwtf.prototype.__act = function() {
                 (function(x) {return roomsEntered[x.getName()] === undefined; }, nearbyRooms);
     
     // enter protected room
-    if (!is_empty_list(protectedRm)) {
+    if (!is_empty_list(protectedRm) && !bombUsed) {
         if (!is_empty_list(myKeycards)) {
             display("ROOM here");
             this.moveTo(head(protectedRm));
+            // M18 T2: plant bomb and GTFO
+            if (bomb.canBeUsed()) {
+                this.use(bomb);
+                bombUsed = true;
+            } else {}
         } else {
             // M17 T2 rmb room
             generatorRoom = head(protectedRm);
@@ -201,8 +219,14 @@ idkwtf.prototype.__act = function() {
             this.moveTo(list_ref(nearbyRooms, getRandomInt(0, length(nearbyRooms))));
         }
         
+    // M18 T2: GTFO
+    } else if (bombUsed) {
+        display("bomb used");
+        var ok_rooms = filter(function(x) {return !is_instance_of(x, ProtectedRoom);}, nearbyRooms);
+        this.moveTo(head(ok_rooms));
+        
     // M17 T2: got keycard chiong to room
-    } else if (!is_empty_list(myKeycards)) {
+    } else if (!is_empty_list(myKeycards) && !bombUsed) {
         // recalculate if moved (respawn)
         var next_move = path.pop();
         this.moveTo(next_move);
@@ -210,6 +234,9 @@ idkwtf.prototype.__act = function() {
     // M17 T1: found unvisited room, move to random unvisited room
     } else if (!is_empty_list(unvisited_rooms)) {
         this.moveTo(list_ref(unvisited_rooms, getRandomInt(0, length(unvisited_rooms))));
+        
+    
+    
     // no unvisited room
     } else {
         this.moveTo(list_ref(nearbyRooms, getRandomInt(0, length(nearbyRooms))));
@@ -218,4 +245,6 @@ idkwtf.prototype.__act = function() {
 
 // Uncomment the following to test
 var newPlayer = new idkwtf(shortname);
-test_task1(newPlayer);
+test_task2(newPlayer);
+
+// "generator is destroyed!"
